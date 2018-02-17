@@ -8,12 +8,15 @@ package org.mifosplatform.organisation.teller.service;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.LocalDate;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.mifosplatform.infrastructure.core.domain.JdbcSupport;
 import org.mifosplatform.infrastructure.core.exception.UnrecognizedQueryParamException;
 import org.mifosplatform.infrastructure.core.service.RoutingDataSource;
@@ -53,6 +56,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
     private final OfficeReadPlatformService officeReadPlatformService;
     private final StaffReadPlatformService staffReadPlatformService;
     private final CurrencyReadPlatformService currencyReadPlatformService;
+    private static final SimpleDateFormat sqlDateFormatter = new SimpleDateFormat("yyyyMMdd");
 
     @Autowired
     public TellerManagementReadPlatformServiceImpl(final PlatformSecurityContext context, final RoutingDataSource dataSource,
@@ -256,7 +260,19 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
 
     @Override
     public Collection<CashierData> getCashiersForTeller(Long tellerId, Date fromDate, Date toDate) {
-        return retrieveCashiersForTellers(null, tellerId);
+    	String dateCriteria = null;
+    	if(fromDate !=null || toDate!=null){
+
+    		if(toDate==null)
+    			dateCriteria = " start_date='"+sqlDateFormatter.format(fromDate)+"' ";
+    		else if(fromDate==null)
+    			dateCriteria = " end_date='"+sqlDateFormatter.format(toDate)+"' ";
+    		else
+    			dateCriteria = " start_date >= '"+sqlDateFormatter.format(fromDate)
+    				+"' and end_date <= '"+sqlDateFormatter.format(toDate)+"'";
+    	}
+    	
+        return retrieveCashiersForTellers(dateCriteria, tellerId);
     }
 
     @Override
@@ -291,7 +307,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         if (StringUtils.isNotBlank(extraCriteria)) {
             sql += " where " + extraCriteria;
         }
-        sql = sql + " order by teller_name";
+        sql = sql + " order by start_date desc, teller_name";
         return this.jdbcTemplate.query(sql, cm, new Object[] {});
     }
 
@@ -433,11 +449,12 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         OfficeData officeData = officeReadPlatformService.retrieveOffice(staffData.getOfficeId());
         final String hierarchy = officeData.getHierarchy();
         String hierarchySearchString = null;
-        if (includeAllTellers) {
+//Commented out by Kwaku Twumasi. Really? is this neccessary? Incomplete spec to me...
+//        if (includeAllTellers) {
             hierarchySearchString = "." + "%";
-        } else {
-            hierarchySearchString = hierarchy;
-        }
+//        } else {
+//            hierarchySearchString = hierarchy;
+//        }
         final CashierTransactionSummaryMapper ctsm = new CashierTransactionSummaryMapper();
         final String sql = "select " + ctsm.cashierTxnSummarySchema() + " limit 1000";
 
@@ -486,11 +503,12 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         OfficeData officeData = officeReadPlatformService.retrieveOffice(staffData.getOfficeId());
         final String hierarchy = officeData.getHierarchy();
         String hierarchySearchString = null;
-        if (includeAllTellers) {
+//Kwaku twumasi Not neccessary...don;t know why Mifos writers put this here....        
+//        if (includeAllTellers) {
             hierarchySearchString = "." + "%";
-        } else {
-            hierarchySearchString = hierarchy;
-        }
+//        } else {
+//            hierarchySearchString = hierarchy;
+//        }
 
         final CashierTransactionMapper ctm = new CashierTransactionMapper();
 
@@ -499,11 +517,11 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
                 + ctm.savingsTxnSchema()
                 + " where sav_txn.is_reversed = 0 and c.id = ? and sav.currency_code = ? and o.hierarchy like ? and "
                 + " sav_txn.transaction_date between c.start_date and date_add(c.end_date, interval 1 day) "
-                + " and renum.enum_value in ('deposit','withdrawal fee', 'Pay Charge', 'withdrawal') ) " + " union (select "
+                + " and renum.enum_value in ('deposit','withdrawal fee', 'Pay Charge', 'withdrawal') and pmty.is_cash_payment=1 ) " + " union (select "
                 + ctm.loansTxnSchema()
                 + " where loan_txn.is_reversed = 0 and c.id = ? and loan.currency_code = ? and o.hierarchy like ? and "
                 + " loan_txn.transaction_date between c.start_date and date_add(c.end_date, interval 1 day) "
-                + " and renum.enum_value in ('Repayment At Disbursement','Repayment', 'Recovery Payment','Disbursement') ) "
+                + " and renum.enum_value in ('Repayment At Disbursement','Repayment', 'Recovery Payment','Disbursement') and pmty.is_cash_payment=1 ) "
                 + " order by created_date ";
 
         return this.jdbcTemplate.query(sql, ctm, new Object[] { cashierId, currencyCode, hierarchySearchString, cashierId, currencyCode,
@@ -601,6 +619,8 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append(" left join m_appuser user on sav_txn.appuser_id = user.id ");
             sqlBuilder.append(" left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append(" left join m_cashiers c on c.staff_id = staff.id ");
+            sqlBuilder.append(" left join m_payment_detail pmd on pmd.id = sav_txn.payment_detail_id ");
+            sqlBuilder.append(" left join m_payment_type pmty on pmty.id = pmd.payment_type_id ");
 
             return sqlBuilder.toString();
         }
@@ -633,6 +653,8 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append(" left join m_appuser user on loan_txn.appuser_id = user.id ");
             sqlBuilder.append(" left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append(" left join m_cashiers c on c.staff_id = staff.id ");
+            sqlBuilder.append(" left join m_payment_detail pmd on pmd.id = loan_txn.payment_detail_id ");
+            sqlBuilder.append(" left join m_payment_type pmty on pmty.id = pmd.payment_type_id ");
 
             return sqlBuilder.toString();
         }
@@ -718,11 +740,13 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append("	left join m_appuser user on sav_txn.appuser_id = user.id ");
             sqlBuilder.append("	left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append("	left join m_cashiers c on c.staff_id = staff.id ");
+            sqlBuilder.append(" left join m_payment_detail pmd on pmd.id = sav_txn.payment_detail_id ");
+            sqlBuilder.append(" left join m_payment_type pmty on pmty.id = pmd.payment_type_id ");
             sqlBuilder.append("	where sav_txn.is_reversed = 0 and c.id = ? ");
             sqlBuilder.append(" and sav.currency_code = ? ");
             sqlBuilder.append("	and o.hierarchy like ? ");
             sqlBuilder.append("	and sav_txn.transaction_date between c.start_date and date_add(c.end_date, interval 1 day) ");
-            sqlBuilder.append("	) ");
+            sqlBuilder.append("	and pmty.is_cash_payment=1 ) ");
             sqlBuilder.append("	UNION ");
             sqlBuilder.append("	( ");
             sqlBuilder.append("	select loan_txn.id as txn_id, c.id as cashier_id, ");
@@ -749,11 +773,13 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append("	left join m_appuser user on loan_txn.appuser_id = user.id ");
             sqlBuilder.append("	left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append("	left join m_cashiers c on c.staff_id = staff.id ");
+            sqlBuilder.append(" left join m_payment_detail pmd on pmd.id = loan_txn.payment_detail_id ");
+            sqlBuilder.append(" left join m_payment_type pmty on pmty.id = pmd.payment_type_id ");
             sqlBuilder.append("	where loan_txn.is_reversed = 0 and c.id = ? ");
             sqlBuilder.append(" and loan.currency_code = ? ");
             sqlBuilder.append("	and o.hierarchy like ? ");
             sqlBuilder.append("	and loan_txn.transaction_date between c.start_date and date_add(c.end_date, interval 1 day) ");
-            sqlBuilder.append("	) ");
+            sqlBuilder.append("	and pmty.is_cash_payment=1 ) ");
             sqlBuilder.append("	) txns ");
             sqlBuilder.append("	group by cash_txn_type ");
 

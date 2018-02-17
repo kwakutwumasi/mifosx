@@ -121,9 +121,14 @@ public class TellerApiResource {
     public String getCashierData(@PathParam("tellerId") final Long tellerId, @QueryParam("fromdate") final String fromDateStr,
             @QueryParam("todate") final String toDateStr) {
         final DateTimeFormatter dateFormatter = ISODateTimeFormat.basicDate();
-
-        final Date fromDate = (fromDateStr != null ? dateFormatter.parseDateTime(fromDateStr).toDate() : new Date());
-        final Date toDate = (toDateStr != null ? dateFormatter.parseDateTime(toDateStr).toDate() : new Date());
+        //@author Kwaku Twumasi. Changed to create new behavior: if fromdate and todate queryparam is specified only show Cashiers for a specific date range. 
+        //If specified, show cashiers for that period.
+        
+        final Date fromDate = (fromDateStr != null && fromDateStr.matches("[\\d]{8}") //make sure it fits yyyyMMdd format 
+        		? dateFormatter.parseDateTime(fromDateStr).toDate() : null);
+        
+        final Date toDate = (toDateStr != null && toDateStr.matches("[\\d]{8}") //make sure it fits yyyyMMdd format 
+        		? dateFormatter.parseDateTime(toDateStr).toDate() : null);
 
         final TellerData teller = this.readPlatformService.findTeller(tellerId);
         final Collection<CashierData> cashiers = this.readPlatformService.getCashiersForTeller(tellerId, fromDate, toDate);

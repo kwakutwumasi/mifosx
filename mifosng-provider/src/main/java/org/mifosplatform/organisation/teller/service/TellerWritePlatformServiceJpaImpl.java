@@ -412,7 +412,7 @@ public class TellerWritePlatformServiceJpaImpl implements TellerWritePlatformSer
 
             final JournalEntry debitJournalEntry = JournalEntry.createNew(cashierOffice, null, // payment
                                                                                                // detail
-                    debitAccount, "USD", // FIXME: Take currency code from the
+                    debitAccount, cashierTxn.getCurrencyCode(), // FIXED: Take currency code from the
                                          // transaction
                     transactionId, false, // manual entry
                     cashierTxn.getTxnDate(), JournalEntryType.DEBIT, cashierTxn.getTxnAmount(), cashierTxn.getTxnNote(), // Description
@@ -421,7 +421,7 @@ public class TellerWritePlatformServiceJpaImpl implements TellerWritePlatformSer
 
             final JournalEntry creditJournalEntry = JournalEntry.createNew(cashierOffice, null, // payment
                                                                                                 // detail
-                    creditAccount, "USD", // FIXME: Take currency code from the
+                    creditAccount, cashierTxn.getCurrencyCode(), // FIXED: Take currency code from the
                                           // transaction
                     transactionId, false, // manual entry
                     cashierTxn.getTxnDate(), JournalEntryType.CREDIT, cashierTxn.getTxnAmount(), cashierTxn.getTxnNote(), // Description

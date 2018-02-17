@@ -3,6 +3,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
+
+
+
+
+
+
+
+
+
+
+
+
 package org.mifosplatform.infrastructure.core.service;
 
 import org.apache.commons.lang.StringUtils;
@@ -35,6 +48,12 @@ public final class SearchParameters {
     private final Long productId ;
     private final Long categoryId ;
 	private final boolean isSelfUser;
+	private static final String SEARCHPARAMPATTERN = "([a-zA-Z_\\.]+(\\s)*(=|(\\s)like(\\s)|(\\s)LIKE(\\s))(\\s)*"
+			+ "((['\"]{1}[%a-zA-Z0-9\\s]+['\"]+)|([\\d]+(\\.[\\d]{1,2})?)))"
+			+ "((\\s)*((\\s)and(\\s)|(\\s)or(\\s)|(\\s)AND(\\s)|(\\s)OR(\\s))"
+			+ "(\\s)*([a-zA-Z_\\.]+(\\s)*(=|(\\s)like(\\s)|(\\s)LIKE(\\s))"
+			+ "(\\s)*((['\"]{1}[%a-zA-Z0-9\\s]+['\"]+)|([\\d]+(\\.[\\d]{1,2})?))))*";	
+
     
 	public static SearchParameters from(final String sqlSearch, final Long officeId, final String externalId, final String name,
             final String hierarchy) {
@@ -186,7 +205,17 @@ public final class SearchParameters {
             final String hierarchy, final String firstname, final String lastname, final Integer offset, final Integer limit,
             final String orderBy, final String sortOrder, final Long staffId, final String accountNo, final Long loanId,
             final Long savingsId, final Boolean orphansOnly, boolean isSelfUser) {
-        this.sqlSearch = sqlSearch;
+/*	@QuakeArts says:
+        Added to prevent injection attacks. Default settings of MySQL connector prevents injection by requiring
+        each query call to be a single statement. However in the event that allowMultiQueries=true
+        is set on the connection (for another application, perhaps) its better to restrict the format
+         of the sqlSearch parameter to name=value pairs
+ */
+        if(sqlSearch!=null){
+        		this.sqlSearch = sqlSearch.matches(SEARCHPARAMPATTERN)?sqlSearch:null;
+        } else {
+        		this.sqlSearch = null;
+        	}
         this.officeId = officeId;
         this.externalId = externalId;
         this.name = name;
@@ -240,7 +269,17 @@ public final class SearchParameters {
             final String firstname, final String lastname, final Integer offset, final Integer limit, final String orderBy,
             final String sortOrder, final Long staffId, final String accountNo, final Long loanId, final Long savingsId,
             final Boolean orphansOnly, final String currencyCode) {
-        this.sqlSearch = sqlSearch;
+    	/*	@QuakeArts says:
+        Added to prevent injection attacks. Default settings of MySQL connector prevents injection by requiring
+        each query call to be a single statement. However in the event that allowMultiQueries=true
+        is set on the connection (for another application, perhaps) its better to restrict the format
+         of the sqlSearch parameter to name=value pairs
+ */
+        if(sqlSearch!=null){
+        		this.sqlSearch = sqlSearch.matches(SEARCHPARAMPATTERN)?sqlSearch:null;
+        } else {
+        		this.sqlSearch = null;
+        	}
         this.officeId = officeId;
         this.externalId = externalId;
         this.name = name;
