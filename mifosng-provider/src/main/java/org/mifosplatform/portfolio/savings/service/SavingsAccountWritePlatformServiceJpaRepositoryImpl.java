@@ -76,6 +76,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -787,9 +788,9 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
                 if (!dataValidationErrors.isEmpty()) { throw new PlatformApiDataValidationException(dataValidationErrors); }
             }
         }
-
         savingsAccount.addCharge(fmt, savingsAccountCharge, chargeDefinition);
 
+        this.savingsAccountChargeRepository.save(savingsAccountCharge);
         this.savingAccountRepository.saveAndFlush(savingsAccount);
 
         return new CommandProcessingResultBuilder() //
@@ -964,12 +965,20 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
         }
 
         this.payCharge(savingsAccountCharge, transactionDate, amountPaid, fmt, user);
+        
+        Long transactionId = savingsAccountCharge.savingsAccount().getTransactions()
+        		.get(savingsAccountCharge.savingsAccount().getTransactions().size()-1).getId();
+        
+        Map<String, Object> changes = new HashMap<>();
+        changes.put("savingsTransactionId", transactionId);
+        
         return new CommandProcessingResultBuilder() //
                 .withEntityId(savingsAccountCharge.getId()) //
                 .withOfficeId(savingsAccountCharge.savingsAccount().officeId()) //
                 .withClientId(savingsAccountCharge.savingsAccount().clientId()) //
                 .withGroupId(savingsAccountCharge.savingsAccount().groupId()) //
                 .withSavingsId(savingsAccountCharge.savingsAccount().getId()) //
+                .with(changes)
                 .build();
 
     }
